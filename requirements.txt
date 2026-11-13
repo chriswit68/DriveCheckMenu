@@ -1,0 +1,12 @@
+Ziel dieser Swift-Anwendung  ist es als kleines Menüitem in der Macos Menüleiste den (SMART)-Status der angeschlossenen Massenspeicher zu überwachen und anzuzeigen.
+über den mal die zu überwachenden Massenspeicher auswählen kann.
+Das Menüitem in der Menüleiste soll als default ein graues HD-Symbol darstellen. Wenn ein Problem auftritt soll es rot dargestellt werden.
+Zur ermittlung der Stati darf die Anwendung auf Macos-Sytemprogramme wie diskutils usw zugreifen, und deren Daten interpretieren.
+Ein besonderer Focus soll auf die RAID-Überwchung liegen, sofern welche konfiguriert werden.
+Die App soll als App-Bundle erzeugt werden, so dass man sie aus dem Finder heraus starten kann.
+über die rechte Maustaste auf dem Menüitem, erreichbar , soll ein Settings-Dialog erscheinen, 
+Einstellung sollen sein:
+- Beim Login automatsch mit starten (an/aus)
+- Auswahl der zu überwachenden Massenspeicher
+- Auswahl der zu überwachenden RAID-Konfigurationen
+- Intervall der Überprüfung (minute, Stunde, täglich, usw.)

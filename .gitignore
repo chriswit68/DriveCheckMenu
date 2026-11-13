@@ -1,0 +1,21 @@
+# Build-Artefakte
+.build/
+build/
+.swiftpm/
+
+# Erzeugtes App-Icon (wird von scripts/make-icns.swift generiert)
+Resources/AppIcon.iconset/
+Resources/AppIcon.icns
+
+# macOS
+.DS_Store
+._*
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+
+# Editor
+.vscode/
+.idea/

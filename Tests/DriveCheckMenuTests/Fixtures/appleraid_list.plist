@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AppleRAIDSets</key>
+	<array>
+		<dict>
+			<key>AppleRAIDSetUUID</key>
+			<string>D3ABDE08-13A0-42B7-9C73-AEDEDCF3F0AE</string>
+			<key>BSD Name</key>
+			<string>disk8</string>
+			<key>ChunkCount</key>
+			<integer>3814166</integer>
+			<key>ChunkSize</key>
+			<integer>262144</integer>
+			<key>Content</key>
+			<string>7C3457EF-0000-11AA-AA11-00306543ECAC</string>
+			<key>Level</key>
+			<string>Mirror</string>
+			<key>Members</key>
+			<array>
+				<dict>
+					<key>AppleRAIDMemberUUID</key>
+					<string>B3ABF3F1-9972-4B6E-92F8-4784474C35C4</string>
+					<key>BSD Name</key>
+					<string>disk4s2</string>
+					<key>MemberStatus</key>
+					<string>Online</string>
+				</dict>
+				<dict>
+					<key>AppleRAIDMemberUUID</key>
+					<string>0BAB7676-56A4-4520-8A0C-C01073C573E2</string>
+					<key>BSD Name</key>
+					<string>disk5s2</string>
+					<key>MemberStatus</key>
+					<string>Online</string>
+				</dict>
+			</array>
+			<key>Name</key>
+			<string>RAID1-SAMSUNG-SSD-1TB</string>
+			<key>Rebuild</key>
+			<string>Automatic</string>
+			<key>Size</key>
+			<integer>999860731904</integer>
+			<key>Spares</key>
+			<array/>
+			<key>Status</key>
+			<string>Online</string>
+		</dict>
+	</array>
+</dict>
+</plist>

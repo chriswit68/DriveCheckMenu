@@ -1,0 +1,43 @@
+{
+  "json_format_version": [
+    1,
+    0
+  ],
+  "smartctl": {
+    "version": [
+      7,
+      5
+    ],
+    "pre_release": false,
+    "svn_revision": "5714",
+    "platform_info": "Darwin 27.2.0 arm64",
+    "build_info": "(local build)",
+    "argv": [
+      "smartctl",
+      "-l",
+      "selftest",
+      "-j",
+      "disk6"
+    ],
+    "drive_database_version": {
+      "string": "7.5/5706"
+    },
+    "exit_status": 0
+  },
+  "local_time": {
+    "time_t": 1794563796,
+    "asctime": "Fri Nov 13 10:56:36 2026 CET"
+  },
+  "device": {
+    "name": "disk6",
+    "info_name": "disk6",
+    "type": "ata",
+    "protocol": "ATA"
+  },
+  "ata_smart_self_test_log": {
+    "standard": {
+      "revision": 1,
+      "count": 0
+    }
+  }
+}
