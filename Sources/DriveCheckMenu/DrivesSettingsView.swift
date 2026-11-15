@@ -92,6 +92,9 @@ struct DrivesSettingsView: View {
             status.drive.locationText,
             status.drive.kindText
         ]
+        if let usage = status.usage {
+            parts.append(usage.shortText)
+        }
         if let smart = status.smart, smart.source == .diskutil {
             parts.append("SMART-Basisstatus")
         }

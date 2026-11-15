@@ -94,8 +94,9 @@ struct RaidSettingsView: View {
         return [
             status.raid.levelText,
             status.raid.sizeText,
+            status.usage?.shortText,
             "Status: \(status.raid.status)",
             "/dev/\(status.raid.bsdName)"
-        ].joined(separator: " · ")
+        ].compactMap { $0 }.joined(separator: " · ")
     }
 }

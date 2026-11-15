@@ -82,6 +82,9 @@ enum StatusMenuBuilder {
         addInfo(to: submenu, title: "Modell: \(status.drive.displayName)")
         addInfo(to: submenu, title: "Seriennummer: \(status.drive.serial ?? "–")")
         addInfo(to: submenu, title: "Größe: \(status.drive.sizeText)")
+        if let usage = status.usage {
+            addInfo(to: submenu, title: usage.summaryText)
+        }
         addInfo(to: submenu, title: "Anschluss: \(status.drive.protocolName) · \(status.drive.kindText) · \(status.drive.locationText)")
         addInfo(to: submenu, title: "Gerät: \(status.isConnected ? "/dev/\(status.drive.bsdName)" : "nicht verbunden")")
 
@@ -217,6 +220,9 @@ enum StatusMenuBuilder {
         addInfo(to: submenu, title: "Level: \(status.raid.levelText)")
         addInfo(to: submenu, title: "Status: \(status.raid.status)")
         addInfo(to: submenu, title: "Größe: \(status.raid.sizeText)")
+        if let usage = status.usage {
+            addInfo(to: submenu, title: usage.summaryText)
+        }
         addInfo(to: submenu, title: "Gerät: \(status.isConnected ? "/dev/\(status.raid.bsdName)" : "nicht verfügbar")")
         if let progress = status.raid.rebuildProgress {
             addInfo(to: submenu, title: "Rebuild: \(Format.number(progress)) %")

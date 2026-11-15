@@ -142,6 +142,66 @@ public struct SmartHealth: Codable, Hashable, Sendable {
     }
 }
 
+// MARK: - Storage usage
+
+/// Currently used capacity of a mass storage device or volume group.
+///
+/// The values are read from the mounted file systems (one `getfsstat` call), so they
+/// describe the space actually occupied by user data, not the raw device wear level.
+public struct StorageUsage: Codable, Hashable, Sendable {
+    public var totalBytes: Int64
+    public var usedBytes: Int64
+
+    public init(totalBytes: Int64, usedBytes: Int64) {
+        self.totalBytes = max(0, totalBytes)
+        self.usedBytes = min(max(0, usedBytes), max(0, totalBytes))
+    }
+
+    public var percentUsed: Double? {
+        guard totalBytes > 0 else { return nil }
+        return Double(usedBytes) / Double(totalBytes) * 100
+    }
+
+    public var usedText: String { Format.bytes(usedBytes) }
+    public var totalText: String { Format.bytes(totalBytes) }
+
+    public var percentText: String? {
+        percentUsed.map { String(format: "%.0f %%", $0) }
+    }
+
+    /// Re-bases the usage on the device capacity so the percentage matches the displayed size.
+    public func rebased(toTotal totalBytes: Int64) -> StorageUsage {
+        guard totalBytes > 0 else { return self }
+        return StorageUsage(totalBytes: totalBytes, usedBytes: usedBytes)
+    }
+
+    /// "Belegt: 265,01 GB von 999,86 GB (27 %)"
+    public var summaryText: String {
+        if let percentText {
+            return "Belegt: \(usedText) von \(totalText) (\(percentText))"
+        }
+        return "Belegt: \(usedText) von \(totalText)"
+    }
+
+    /// "265,01 GB belegt (27 %)"
+    public var shortText: String {
+        if let percentText {
+            return "\(usedText) belegt (\(percentText))"
+        }
+        return "\(usedText) belegt"
+    }
+
+    /// Adds up the usage of several file systems (e.g. multiple APFS containers on one disk).
+    public static func combined(_ usages: [StorageUsage]) -> StorageUsage? {
+        let valid = usages.filter { $0.totalBytes > 0 }
+        guard !valid.isEmpty else { return nil }
+        return StorageUsage(
+            totalBytes: valid.reduce(0) { $0 + $1.totalBytes },
+            usedBytes: valid.reduce(0) { $0 + $1.usedBytes }
+        )
+    }
+}
+
 // MARK: - Drives
 
 public struct DriveInfo: Codable, Hashable, Identifiable, Sendable {
@@ -230,6 +290,8 @@ public struct StoredDrive: Codable, Hashable, Identifiable, Sendable {
 public struct DriveStatus: Identifiable, Sendable {
     public var drive: DriveInfo
     public var smart: SmartHealth?
+    /// Used capacity of the mounted file systems on this disk. nil when unavailable.
+    public var usage: StorageUsage?
     public var health: HealthLevel
     public var reasons: [String]
     public var isMonitored: Bool
@@ -240,6 +302,7 @@ public struct DriveStatus: Identifiable, Sendable {
     public init(
         drive: DriveInfo,
         smart: SmartHealth? = nil,
+        usage: StorageUsage? = nil,
         health: HealthLevel = .unknown,
         reasons: [String] = [],
         isMonitored: Bool = false,
@@ -247,6 +310,7 @@ public struct DriveStatus: Identifiable, Sendable {
     ) {
         self.drive = drive
         self.smart = smart
+        self.usage = usage
         self.health = health
         self.reasons = reasons
         self.isMonitored = isMonitored
@@ -347,6 +411,8 @@ public struct StoredRaid: Codable, Hashable, Identifiable, Sendable {
 
 public struct RaidStatus: Identifiable, Sendable {
     public var raid: RaidSetInfo
+    /// Used capacity of the file systems on the RAID volume. nil when unavailable.
+    public var usage: StorageUsage?
     public var health: HealthLevel
     public var reasons: [String]
     public var isMonitored: Bool
@@ -356,12 +422,14 @@ public struct RaidStatus: Identifiable, Sendable {
 
     public init(
         raid: RaidSetInfo,
+        usage: StorageUsage? = nil,
         health: HealthLevel = .unknown,
         reasons: [String] = [],
         isMonitored: Bool = false,
         isConnected: Bool = true
     ) {
         self.raid = raid
+        self.usage = usage
         self.health = health
         self.reasons = reasons
         self.isMonitored = isMonitored

@@ -49,6 +49,9 @@ func dumpStatus() {
         let mark = status.isMonitored ? "[x]" : "[ ]"
         print("\(mark) \(status.drive.displayName) (/dev/\(status.drive.bsdName)) – \(status.health.label)")
         print("    \(status.drive.sizeText) · \(status.drive.protocolName) · \(status.drive.locationText) · \(status.drive.kindText) · \(status.drive.id)")
+        if let usage = status.usage {
+            print("    \(usage.summaryText)")
+        }
         if let smart = status.smart {
             var parts = ["Quelle: \(smart.source.label)"]
             if let temperature = smart.temperatureCelsius { parts.append("Temp: \(Format.number(temperature)) °C") }
@@ -69,6 +72,9 @@ func dumpStatus() {
         let mark = status.isMonitored ? "[x]" : "[ ]"
         print("\(mark) RAID \(status.raid.displayName) (/dev/\(status.raid.bsdName)) – \(status.health.label)")
         print("    \(status.raid.levelText) · \(status.raid.sizeText) · Status: \(status.raid.status) · Mitglieder: \(status.raid.members.map { "\($0.bsdName)=\($0.status)" }.joined(separator: ", "))")
+        if let usage = status.usage {
+            print("    \(usage.summaryText)")
+        }
         for reason in status.reasons {
             print("    – \(reason)")
         }

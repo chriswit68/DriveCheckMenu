@@ -334,6 +334,103 @@ final class DriveCheckMenuTests: XCTestCase {
         XCTAssertTrue(reloaded.defaultSelectionApplied)
         XCTAssertEqual(reloaded.intervalSeconds, 900)
     }
+
+    // MARK: Storage usage
+
+    func testStorageUsageMappingFromDiskutilList() throws {
+        let plist = try fixturePlist("diskutil_list")
+        let hierarchy = try XCTUnwrap(plist["AllDisksAndPartitions"] as? [[String: Any]])
+
+        let containerSize = Int64(999_860_731_904)
+        let mounts = [
+            MountedVolumeSample(device: "/dev/disk9s1", totalBytes: containerSize, usedBytes: 265_008_218_112),
+            MountedVolumeSample(device: "/dev/disk7s2", totalBytes: 511_900_434_432, usedBytes: 263_735_578_624),
+            MountedVolumeSample(device: "/dev/disk3s5", totalBytes: 494_332_366_848, usedBytes: 92_725_604_352),
+            // Same APFS container as disk3s5 (root snapshot): must not be counted twice.
+            MountedVolumeSample(device: "/dev/disk3s1s1", totalBytes: 494_332_366_848, usedBytes: 92_725_604_352)
+        ]
+
+        let usages = StorageUsageProbe.usages(allDisksAndPartitions: hierarchy, mounts: mounts)
+
+        // RAID set disk8 is the physical store of the APFS container disk9.
+        XCTAssertEqual(usages["disk8"]?.usedBytes, 265_008_218_112)
+        XCTAssertEqual(usages["disk8"]?.totalBytes, containerSize)
+
+        // External disk6 hosts container disk7.
+        XCTAssertEqual(usages["disk6"]?.usedBytes, 263_735_578_624)
+        XCTAssertEqual(usages["disk6"]?.totalBytes, 511_900_434_432)
+
+        // Internal disk0: container disk3 counted once despite two mount samples; the
+        // mounted container disk1 has no sample here and falls back to CapacityInUse.
+        XCTAssertEqual(usages["disk0"]?.usedBytes, 92_738_707_456)
+        XCTAssertEqual(usages["disk0"]?.totalBytes, 494_909_083_648)
+
+        // RAID members have no file system of their own.
+        XCTAssertNil(usages["disk4"])
+        XCTAssertNil(usages["disk5"])
+    }
+
+    func testStorageUsageFallsBackToCapacityInUse() throws {
+        let plist = try fixturePlist("diskutil_list")
+        let hierarchy = try XCTUnwrap(plist["AllDisksAndPartitions"] as? [[String: Any]])
+
+        let usages = StorageUsageProbe.usages(allDisksAndPartitions: hierarchy, mounts: [])
+
+        // Disk1 (13_103_104) + disk3 volumes without the snapshot duplicate (95_979_520_000).
+        XCTAssertEqual(usages["disk0"]?.usedBytes, 95_992_623_104)
+        XCTAssertEqual(usages["disk0"]?.totalBytes, 494_909_083_648)
+        XCTAssertEqual(usages["disk8"]?.usedBytes, 265_008_218_112)
+        XCTAssertEqual(usages["disk6"]?.usedBytes, 263_735_578_624)
+    }
+
+    func testStorageUsagePlainFilesystem() {
+        let hierarchy: [[String: Any]] = [
+            [
+                "DeviceIdentifier": "disk12",
+                "Size": 2_000_000_000_000,
+                "Partitions": [
+                    ["DeviceIdentifier": "disk12s1", "Size": 1_999_000_000_000, "Content": "Microsoft Basic Data"]
+                ]
+            ]
+        ]
+        let mounts = [
+            MountedVolumeSample(device: "/dev/disk12s1", totalBytes: 1_999_000_000_000, usedBytes: 500_000_000_000),
+            MountedVolumeSample(device: "/dev/disk12s1", totalBytes: 1_999_000_000_000, usedBytes: 500_000_000_000)
+        ]
+
+        let usages = StorageUsageProbe.usages(allDisksAndPartitions: hierarchy, mounts: mounts)
+        XCTAssertEqual(usages["disk12"]?.usedBytes, 500_000_000_000)
+        XCTAssertEqual(usages["disk12"]?.totalBytes, 1_999_000_000_000)
+    }
+
+    func testStorageUsageFormattingAndRebasing() {
+        let usage = StorageUsage(totalBytes: 1_000, usedBytes: 250)
+        XCTAssertEqual(usage.percentUsed ?? 0, 25, accuracy: 0.001)
+        XCTAssertEqual(usage.percentText, "25 %")
+        XCTAssertTrue(usage.summaryText.hasPrefix("Belegt: "))
+        XCTAssertTrue(usage.summaryText.hasSuffix("(25 %)"))
+
+        let rebased = usage.rebased(toTotal: 5_000)
+        XCTAssertEqual(rebased.usedBytes, 250)
+        XCTAssertEqual(rebased.totalBytes, 5_000)
+        XCTAssertEqual(rebased.percentText, "5 %")
+
+        let combined = StorageUsage.combined([usage, StorageUsage(totalBytes: 3_000, usedBytes: 750)])
+        XCTAssertEqual(combined?.totalBytes, 4_000)
+        XCTAssertEqual(combined?.usedBytes, 1_000)
+        XCTAssertEqual(combined?.percentText, "25 %")
+
+        // Clamp used to total and ignore empty file systems.
+        XCTAssertEqual(StorageUsage(totalBytes: 100, usedBytes: 200).usedBytes, 100)
+        XCTAssertNil(StorageUsage.combined([StorageUsage(totalBytes: 0, usedBytes: 0)]))
+    }
+
+    func testWholeDiskIdentifier() {
+        XCTAssertEqual(StorageUsageProbe.wholeDiskIdentifier(for: "disk0s2"), "disk0")
+        XCTAssertEqual(StorageUsageProbe.wholeDiskIdentifier(for: "disk12s1s1"), "disk12")
+        XCTAssertEqual(StorageUsageProbe.wholeDiskIdentifier(for: "disk8"), "disk8")
+        XCTAssertEqual(StorageUsageProbe.wholeDiskIdentifier(for: "disk0"), "disk0")
+    }
 }
 
 private func merge(_ lhs: [String: Any], _ rhs: [String: Any]) -> [String: Any] {

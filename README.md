@@ -1,6 +1,6 @@
 # DriveCheckMenu
 
-Eine native macOS-Menüleisten-App zur Überwachung der SMART-Gesundheit von Massenspeichern und AppleRAID-Verbünden.
+Eine native macOS-Menüleisten-App zur Überwachung der SMART-Gesundheit und der aktuellen Speicherbelegung von Massenspeichern und AppleRAID-Verbünden.
 
 > **Hinweis:** DriveCheckMenu ist ein **Vibe-Code-Experiment**. Der Code entstand überwiegend im Dialog mit einer KI und dient vor allem dazu, Ideen und Arbeitsweisen auszuprobieren. Vor einem produktiven Einsatz bitte selbst prüfen, testen und an die eigenen Anforderungen anpassen.
 
@@ -8,7 +8,7 @@ Das Symbol in der Menüleiste zeigt den Gesamtstatus aller ausgewählten Geräte
 
 | Farbe | Bedeutung |
 | --- | --- |
-| Neutral (passt sich der Menüleiste an) | Alles in Ordnung (oder noch keine Auswahl) |
+| Neutral (passt sich der Menüleiste an) | Alles in Ordnung, Status unbekannt (oder noch keine Auswahl) |
 | Gelb | Warnung, z. B. hohe Temperatur, hoher Verschleiß, Medienfehler, Laufwerk im Standby oder nicht verbunden, RAID-Rebuild |
 | Rot | Problem, z. B. SMART-Fehler, kritische Warnung, schwebende Sektoren, degradiertes/offline RAID |
 
@@ -20,6 +20,7 @@ Das Symbol in der Menüleiste zeigt den Gesamtstatus aller ausgewählten Geräte
 - Detaillierte SMART-Auswertung über `smartctl` (smartmontools), inklusive Temperatur, Verschleiß, Reserveblöcken, Medienfehlern und Fehlerprotokoll
 - Fallback auf den Basis-SMART-Status von `diskutil`, wenn `smartctl` nicht verfügbar ist
 - AppleRAID-Überwachung inklusive Mitgliedsstatus und Rebuild-Fortschritt
+- Anzeige der aktuellen Speicherbelegung (belegte Menge und Prozent) für eingehängte Dateisysteme – ohne zusätzliche Prozesse oder Plattenzugriffe
 - Einstellbare Prüfintervalle von jeder Minute bis täglich
 - Einstellbare Warn- und Kritisch-Schwellwerte für Temperatur und Verschleiß
 - Optionaler SMART-Kurztest pro Laufwerk; bei Bedarf mit Administratorfreigabe über einen einmaligen Systemdialog
@@ -85,7 +86,7 @@ Die Simulation überschreibt nur die Anzeige, echte Geräte werden nicht veränd
 
 ## Bedienung
 
-- **Linksklick** auf das Menüleistensymbol: Statusmenü mit allen überwachten Laufwerken und RAID-Sets. Jedes Laufwerk hat ein Untermenü mit SMART-Details und dem Eintrag „SMART-Kurztest starten“.
+- **Linksklick** auf das Menüleistensymbol: Statusmenü mit allen überwachten Laufwerken und RAID-Sets. Jedes Laufwerk hat ein Untermenü mit SMART-Details, Speicherbelegung und dem Eintrag „SMART-Kurztest starten“.
 - **Rechtsklick** auf das Symbol: Einstellungen.
 - **Einstellungen → Allgemein**: Start beim Anmelden, Prüfintervall, Benachrichtigungen, manuelle Prüfung.
 - **Einstellungen → Laufwerke**: Auswahl der zu überwachenden Laufwerke.
@@ -93,6 +94,25 @@ Die Simulation überschreibt nur die Anzeige, echte Geräte werden nicht veränd
 - **Einstellungen → SMART**: smartctl-Pfad, Schwellwerte und SMART-Kurztest.
 
 Nicht verbundene, aber ausgewählte Laufwerke bleiben in der Auswahl und werden als Warnung angezeigt. So fällt ein ausgefallenes externes Laufwerk auf, statt einfach zu verschwinden.
+
+## Speicherbelegung
+
+Für jedes eingehängte Dateisystem zeigt die App die aktuell belegte Kapazität und den prozentualen Anteil an:
+
+```
+Belegt: 262,33 GB von 999,86 GB (26 %)
+```
+
+Die Zeile erscheint im Untermenü des Laufwerks bzw. RAID-Sets, kompakt in den Einstellungen und in der `--dump`-Ausgabe. Bewusst angezeigt werden nur die belegte Menge und der Prozentwert – keine Angabe des freien Speichers.
+
+- **Bezugsgröße:** Die Prozentangabe bezieht sich auf die angezeigte Gerätegröße. Dadurch passen Prozentwert und „Größe:“-Zeile zusammen.
+- **Ermittlung:** Die Belegung wird aus den eingehängten Dateisystemen gelesen. Dafür genügen zwei `getfsstat`-Aufrufe (Anzahl ermitteln, Daten abrufen); die Partitions- und APFS-Hierarchie stammt aus der ohnehin abgefragten `diskutil list -plist`-Ausgabe. Es werden weder `df`/`du` aufgerufen noch zusätzliche Prozesse gestartet oder Dateisysteminhalte durchsucht. Laufwerke im Standby bleiben dadurch im Standby.
+- **APFS:** Alle Volumes eines Containers melden dieselben containerweiten Werte. Die App zählt jeden Container daher nur einmal. Mehrere Container auf einer physischen Platte werden addiert.
+- **RAID:** Ein RAID-Set zeigt die Belegung seines Dateisystems auf der virtuellen Gesamtplatte (z. B. `disk8`). Mitgliedsplatten ohne eigenes Dateisystem erhalten keine Belegungszeile.
+- **Ohne Dateisystem:** Unformatierte, nicht eingehängte oder anderweitig belegte Speicher werden ohne Belegungszeile angezeigt.
+- **Fallback:** Ist ein laut `diskutil` eingehängter APFS-Container nicht über `getfsstat` messbar, greift die App ersatzweise auf `CapacityInUse` aus der Plist zurück. Diese Werte können geringfügig von den Live-Werten abweichen.
+
+Die Werte werden mit dem normalen Prüfintervall aktualisiert; „Jetzt aktualisieren“ bzw. „Jetzt prüfen“ erfrischt sie sofort.
 
 ## Konfiguration
 
@@ -143,7 +163,10 @@ Tests/
   DriveCheckMenuTests/    Unit-Tests mit echten diskutil-/smartctl-Fixtures
 Resources/                Info.plist, App-Icon
 scripts/                  Build- und Icon-Skripte
+docs/                     Software-Design-Beschreibung nach arc42
 ```
+
+Die Kapazitätsermittlung liegt in `Sources/DriveCheckMenuCore/StorageUsageProbe.swift` (Mount-Samples via `getfsstat`, Zuordnung zu Whole Disks, APFS-Dedupe, Plist-Fallback).
 
 ## Tests
 
@@ -151,7 +174,12 @@ scripts/                  Build- und Icon-Skripte
 swift test
 ```
 
-Die Tests verwenden echte, mitgeschnittene Ausgaben von `diskutil` und `smartctl` (NVMe, SATA, AppleRAID) und prüfen Parser, Schwellwerte, RAID-Bewertung, Auswahl-Logik und Einstellungs-Persistenz.
+Die Tests verwenden echte, mitgeschnittene Ausgaben von `diskutil` und `smartctl` (NVMe, SATA, AppleRAID) und prüfen Parser, Schwellwerte, RAID-Bewertung, Auswahl-Logik und Einstellungs-Persistenz. Zusätzlich deckt die Suite die Kapazitätsermittlung ab (Whole-Disk-Zuordnung, APFS-Dedupe, Plist-Fallback, HFS+/exFAT-Fall, Formatierung und Prozent-Rebasing). Derzeit laufen 23 Tests.
+
+## Dokumentation
+
+- [README.md](README.md) – Einstieg, Installation, Bedienung und Grenzen
+- [docs/arc42.md](docs/arc42.md) – Software-Design-Beschreibung nach arc42: Bausteine, Laufzeitsichten, Architekturentscheidungen, Qualitätsanforderungen und Risiken
 
 ## Lizenz
 

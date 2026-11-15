@@ -31,7 +31,8 @@ public enum StatusCollector {
             : nil
         let smartctlVersion = smartctlPath.flatMap { SmartctlLocator.version(at: $0) }
 
-        var drives = DiskInventory.physicalDisks()
+        let inventory = DiskInventory.inventory()
+        var drives = inventory.drives
         var smartByBSD: [String: SmartHealth] = [:]
 
         for index in drives.indices {
@@ -92,6 +93,7 @@ public enum StatusCollector {
             return DriveStatus(
                 drive: drive,
                 smart: smart,
+                usage: inventory.usageByDisk[drive.bsdName]?.rebased(toTotal: drive.sizeBytes),
                 health: evaluation.level,
                 reasons: evaluation.reasons,
                 isMonitored: matchedDriveIDs.contains(drive.id),
@@ -135,6 +137,7 @@ public enum StatusCollector {
             let evaluation = HealthEvaluator.evaluate(raid: raid)
             return RaidStatus(
                 raid: raid,
+                usage: inventory.usageByDisk[raid.bsdName]?.rebased(toTotal: raid.sizeBytes),
                 health: evaluation.level,
                 reasons: evaluation.reasons,
                 isMonitored: settings.selectedRaidKeys.contains(raid.id),

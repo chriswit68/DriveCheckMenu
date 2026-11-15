@@ -17,14 +17,31 @@ public enum PlistHelper {
 public enum DiskInventory {
     public static let diskutilPath = "/usr/sbin/diskutil"
 
+    /// Result of one inventory pass: the physical disks and the current usage per whole disk.
+    public struct Inventory: Sendable {
+        public var drives: [DriveInfo]
+        /// Keyed by whole disk BSD name (`disk0`, `disk8`, …), including RAID set disks.
+        public var usageByDisk: [String: StorageUsage]
+
+        public init(drives: [DriveInfo], usageByDisk: [String: StorageUsage] = [:]) {
+            self.drives = drives
+            self.usageByDisk = usageByDisk
+        }
+    }
+
     /// Lists all physical whole disks (virtual/synthesized disks are filtered out).
     public static func physicalDisks() -> [DriveInfo] {
+        inventory().drives
+    }
+
+    /// Collects physical disks and their usage from a single `diskutil list -plist` output.
+    public static func inventory() -> Inventory {
         let listResult = Shell.run(diskutilPath, ["list", "-plist"])
         guard
             let listDict = PlistHelper.dictionary(from: Data(listResult.stdout.utf8)),
             let wholeDisks = listDict["WholeDisks"] as? [String]
         else {
-            return []
+            return Inventory(drives: [])
         }
 
         var drives: [DriveInfo] = []
@@ -35,11 +52,21 @@ public enum DiskInventory {
         }
 
         // Deterministic ordering: external first, then by model/BSD name.
-        return drives.sorted {
+        let sorted = drives.sorted {
             if $0.isInternal != $1.isInternal { return !$0.isInternal }
             if $0.model != $1.model { return $0.model.localizedStandardCompare($1.model) == .orderedAscending }
             return $0.bsdName.localizedStandardCompare($1.bsdName) == .orderedAscending
         }
+
+        // Capacity data: the partition hierarchy is already part of the list output, the
+        // used bytes come from one getfsstat syscall (no extra process, no disk I/O).
+        let hierarchy = listDict["AllDisksAndPartitions"] as? [[String: Any]] ?? []
+        let usageByDisk = hierarchy.isEmpty ? [:] : StorageUsageProbe.usages(
+            allDisksAndPartitions: hierarchy,
+            mounts: StorageUsageProbe.currentMountSamples()
+        )
+
+        return Inventory(drives: sorted, usageByDisk: usageByDisk)
     }
 
     /// Reads `diskutil info -plist` for a whole disk and filters out virtual devices.
